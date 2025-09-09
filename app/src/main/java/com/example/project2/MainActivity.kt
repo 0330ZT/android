@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
@@ -16,7 +17,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -27,12 +30,12 @@ import com.example.project2.ui.theme.Project2Theme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge() //让应用内容延伸到状态栏和导航栏区域
         setContent {
-            Project2Theme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            Project2Theme { //应用主题  
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding -> //用于避开系统UI
                     Greeting(
-                        name = "Android",
+                        name = "Android", //传递给Greeting组件的参数
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
@@ -41,16 +44,28 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
+@Composable     //构建UI
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val textState = remember { mutableStateOf("") }
     
     Column(
-        modifier = modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        modifier = modifier.fillMaxSize(),//填充父容器的全部可用空间
+        horizontalAlignment = Alignment.CenterHorizontally,//水平居中
+        verticalArrangement = Arrangement.Center  //垂直居中
     ) {
+        // 添加ImageView组件，显示本地图片
+        Image(
+            painter = painterResource(id = R.drawable.aaa), // 图片放到drawable目录下.名字是实际的图片名字，去掉后缀
+            contentDescription = "微信头像",
+            modifier = Modifier
+                .size(120.dp)   //图片的尺寸
+                .padding(16.dp),  //图片的内边距
+            contentScale = ContentScale.Fit  //保持图片比例
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
         Text(
             text = "Hello $name!",
             modifier = modifier
