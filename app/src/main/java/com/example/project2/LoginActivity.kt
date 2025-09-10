@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -18,14 +19,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.project2.data.AppDatabase
-import com.example.project2.data.User
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.project2.ui.theme.Project2Theme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -36,28 +33,26 @@ class LoginActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Project2Theme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    LoginScreen(
-                        modifier = Modifier.padding(innerPadding),
-                        onLoginSuccess = { user ->
-                            // 登录成功后跳转到MainActivity
-                            val intent = Intent(this@LoginActivity, MainActivity::class.java)
-                            intent.putExtra("username", user.username)
-                            intent.putExtra("isAdmin", user.isAdmin)
-                            startActivity(intent)
-                            finish()
+                LoginScreen(
+                    onLoginSuccess = { username, isAdmin ->
+                        val intent = Intent(this, MainActivity::class.java).apply {
+                            putExtra("username", username)
+                            putExtra("isAdmin", isAdmin)
                         }
-                    )
-                }
+                        startActivity(intent)
+                        finish()
+                    }
+                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     modifier: Modifier = Modifier,
-    onLoginSuccess: (User) -> Unit = {}
+    onLoginSuccess: (String, Boolean) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -68,458 +63,183 @@ fun LoginScreen(
     var isLoading by remember { mutableStateOf(false) }
     var showErrorDialog by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(0f) }
-    var loginMode by remember { mutableStateOf("user") } // "user" 或 "admin"
-    var showRegistrationDialog by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
-    
-    // 初始化数据库数据
-    LaunchedEffect(Unit) {
-        scope.launch {
-            val database = AppDatabase.getDatabase(context)
-            
-            // 检查是否已有数据，如果没有则添加默认数据
-            val userCount = database.userDao().getAllUsers().size
-            if (userCount == 0) {
-                // 添加默认管理员账户
-                val adminUser = User(
-                    username = "admin",
-                    password = "123456",
-                    isAdmin = true,
-                    nickname = "管理员"
-                )
-                database.userDao().insertUser(adminUser)
-                
-                // 添加默认普通用户账户
-                val normalUser = User(
-                    username = "user",
-                    password = "123456",
-                    isAdmin = false,
-                    nickname = "普通用户"
-                )
-                database.userDao().insertUser(normalUser)
-                
-                // 添加一些示例好友关系
-                val friend1 = com.example.project2.data.Friend(
-                    username = "user",
-                    friendUsername = "admin",
-                    friendNickname = "管理员",
-                    friendAvatar = ""
-                )
-                val friend2 = com.example.project2.data.Friend(
-                    username = "admin",
-                    friendUsername = "user",
-                    friendNickname = "普通用户",
-                    friendAvatar = ""
-                )
-                database.userDao().insertFriend(friend1)
-                database.userDao().insertFriend(friend2)
-            }
-        }
-    }
-    
-    // 处理登录成功的情况
-    LaunchedEffect(isLoading) {
-        if (isLoading) {
-            // 模拟进度条动画
-            for (i in 0..100) {
-                progress = i.toFloat()
-                delay(10) // 每10ms更新一次进度
-            }
-            
-            // 1秒后检查登录结果
-            delay(1000)
-            
-            scope.launch {
-                val database = AppDatabase.getDatabase(context)
-                val user = database.userDao().getUser(username, password)
-                
-                if (user != null) {
-                    // 检查登录模式匹配
-                    if ((loginMode == "admin" && user.isAdmin) || 
-                        (loginMode == "user" && !user.isAdmin)) {
-                        onLoginSuccess(user)
-                    } else {
-                        isLoading = false
-                        progress = 0f
-                        errorMessage = "登录模式不匹配，请选择正确的登录模式"
-                        showErrorDialog = true
-                    }
-                } else {
-                    isLoading = false
-                    progress = 0f
-                    errorMessage = "用户名或密码错误"
-                    showErrorDialog = true
-                }
-            }
-        }
-    }
-    
-    Column(
+    var loginMode by remember { mutableStateOf("user") } // "user" or "admin"
+
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
     ) {
-        // 应用图标
-        Image(
-            painter = painterResource(id = R.drawable.aaa),
-            contentDescription = "应用图标",
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
             modifier = Modifier
-                .size(100.dp)
-                .padding(16.dp),
-            contentScale = ContentScale.Fit
-        )
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        // 标题
-        Text(
-            text = "用户登录",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            textAlign = TextAlign.Center
-        )
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        // 登录模式选择
-        Text(
-            text = "选择登录模式",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Row(
-            modifier = Modifier.selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp)
         ) {
-            // 普通用户模式
+            // 登录界面图片
+            Image(
+                painter = painterResource(id = R.drawable.aaa),
+                contentDescription = "登录界面图片",
+                modifier = Modifier
+                    .size(120.dp)
+                    .padding(bottom = 32.dp),
+                contentScale = ContentScale.Fit
+            )
+
+            // 用户名输入框
+            OutlinedTextField(
+                value = username,
+                onValueChange = { username = it },
+                label = { Text("用户名") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 密码输入框
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("密码") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 登录模式选择 (管理员/用户)
             Row(
                 modifier = Modifier
-                    .selectable(
+                    .fillMaxWidth()
+                    .selectableGroup(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("登录模式:", style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.width(8.dp))
+                Row(
+                    Modifier
+                        .selectable(
+                            selected = (loginMode == "user"),
+                            onClick = { loginMode = "user" }
+                        )
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
                         selected = (loginMode == "user"),
-                        onClick = { loginMode = "user" }
+                        onClick = null
                     )
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RadioButton(
-                    selected = (loginMode == "user"),
-                    onClick = { loginMode = "user" }
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("普通用户")
-            }
-            
-            // 管理员模式
-            Row(
-                modifier = Modifier
-                    .selectable(
+                    Text(text = "用户")
+                }
+                Row(
+                    Modifier
+                        .selectable(
+                            selected = (loginMode == "admin"),
+                            onClick = { loginMode = "admin" }
+                        )
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
                         selected = (loginMode == "admin"),
-                        onClick = { loginMode = "admin" }
+                        onClick = null
                     )
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RadioButton(
-                    selected = (loginMode == "admin"),
-                    onClick = { loginMode = "admin" }
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("管理员")
+                    Text(text = "管理员")
+                }
             }
-        }
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        // 用户名输入框
-        OutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text("用户名") },
-            placeholder = { Text("请输入用户名") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            singleLine = true,
-            enabled = !isLoading
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // 密码输入框
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("密码") },
-            placeholder = { Text("请输入密码") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            singleLine = true,
-            enabled = !isLoading
-        )
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        // 按钮行
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // 注册按钮
-            OutlinedButton(
-                onClick = { showRegistrationDialog = true },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(56.dp),
-                enabled = !isLoading
-            ) {
-                Text("注册")
-            }
-            
+            Spacer(modifier = Modifier.height(24.dp))
+
             // 登录按钮
             Button(
                 onClick = {
-                    if (username.isNotEmpty() && password.isNotEmpty()) {
-                        isLoading = true
-                    } else {
-                        Toast.makeText(context, "请输入用户名和密码", Toast.LENGTH_SHORT).show()
+                    isLoading = true
+                    progress = 0f
+                    scope.launch {
+                        var loginSuccess = false
+                        var loggedInUsername = ""
+                        var isAdmin = false
+
+                        // 模拟进度条
+                        val totalTime = 1000L // 1秒
+                        val steps = 100
+                        for (i in 1..steps) {
+                            progress = i / steps.toFloat()
+                            delay(totalTime / steps)
+                        }
+
+                        // 简单的登录验证
+                        when {
+                            loginMode == "admin" && username == "admin" && password == "123456" -> {
+                                loginSuccess = true
+                                loggedInUsername = username
+                                isAdmin = true
+                            }
+                            loginMode == "user" && username == "user" && password == "123456" -> {
+                                loginSuccess = true
+                                loggedInUsername = username
+                                isAdmin = false
+                            }
+                            else -> {
+                                loginSuccess = false
+                            }
+                        }
+
+                        isLoading = false
+                        if (loginSuccess) {
+                            Toast.makeText(context, "登录成功！", Toast.LENGTH_SHORT).show()
+                            onLoginSuccess(loggedInUsername, isAdmin)
+                        } else {
+                            showErrorDialog = true
+                        }
                     }
                 },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(56.dp),
+                modifier = Modifier.fillMaxWidth(),
                 enabled = !isLoading
             ) {
-                if (isLoading) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "登录中...",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                } else {
-                    Text(
-                        text = "登录",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text("登录")
             }
         }
-        
-        // 可视化进度条（当isLoading为true时显示）
+
+        // 登录进度条 (覆盖在内容上方)
         if (isLoading) {
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
             ) {
-                // 线性进度条
-                LinearProgressIndicator(
-                    progress = progress / 100f,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .height(6.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // 进度百分比文本
-                Text(
-                    text = "${progress.toInt()}%",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // 状态文本
-                Text(
-                    text = if (progress < 100) "正在验证登录信息..." else "登录成功，即将跳转...",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // 提示信息
-        Text(
-            text = "测试账号：\n管理员：admin / 123456\n普通用户：user / 123456",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-    }
-    
-    // 注册对话框
-    if (showRegistrationDialog) {
-        RegistrationDialog(
-            onDismiss = { showRegistrationDialog = false },
-            onRegister = { newUser ->
-                scope.launch {
-                    val database = AppDatabase.getDatabase(context)
-                    database.userDao().insertUser(newUser)
-                    Toast.makeText(context, "注册成功！", Toast.LENGTH_SHORT).show()
-                    showRegistrationDialog = false
-                }
-            }
-        )
-    }
-    
-    // 错误弹窗
-    if (showErrorDialog) {
-        AlertDialog(
-            onDismissRequest = { showErrorDialog = false },
-            title = {
-                Text(
-                    text = "登录失败",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(errorMessage)
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { 
-                        showErrorDialog = false
-                        username = ""
-                        password = ""
-                    }
-                ) {
-                    Text("确定")
-                }
-            }
-        )
-    }
-}
-
-@Composable
-fun RegistrationDialog(
-    onDismiss: () -> Unit,
-    onRegister: (User) -> Unit
-) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    var nickname by remember { mutableStateOf("") }
-    var isAdmin by remember { mutableStateOf(false) }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "用户注册",
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("用户名") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("密码") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                OutlinedTextField(
-                    value = confirmPassword,
-                    onValueChange = { confirmPassword = it },
-                    label = { Text("确认密码") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                OutlinedTextField(
-                    value = nickname,
-                    onValueChange = { nickname = it },
-                    label = { Text("昵称") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = isAdmin,
-                        onCheckedChange = { isAdmin = it }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(
+                        progress = progress,
+                        modifier = Modifier.size(80.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 8.dp
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("管理员账户")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "登录中...",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (username.isNotEmpty() && password.isNotEmpty() && 
-                        password == confirmPassword) {
-                        val newUser = User(
-                            username = username,
-                            password = password,
-                            isAdmin = isAdmin,
-                            nickname = nickname.ifEmpty { username }
-                        )
-                        onRegister(newUser)
-                    }
-                }
-            ) {
-                Text("注册")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
             }
         }
-    )
-}
 
-@Preview(showBackground = true)
-@Composable
-fun LoginScreenPreview() {
-    Project2Theme {
-        LoginScreen()
+        // 错误弹窗
+        if (showErrorDialog) {
+            AlertDialog(
+                onDismissRequest = { showErrorDialog = false },
+                title = { Text("登录失败") },
+                text = { Text("用户名或密码错误，或者登录模式不匹配。\n\n默认账户：\n管理员：admin/123456\n用户：user/123456") },
+                confirmButton = {
+                    Button(onClick = { showErrorDialog = false }) {
+                        Text("确定")
+                    }
+                }
+            )
+        }
     }
 }

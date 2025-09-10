@@ -1,5 +1,6 @@
 package com.example.project2
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -7,13 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,17 +21,25 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.project2.ui.theme.Project2Theme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge() //让应用内容延伸到状态栏和导航栏区域
+        enableEdgeToEdge()
+        
+        // 获取从LoginActivity传递的用户信息
+        val username = intent.getStringExtra("username") ?: "Android"
+        val isAdmin = intent.getBooleanExtra("isAdmin", false)
+        
         setContent {
-            Project2Theme { //应用主题  
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding -> //用于避开系统UI
+            Project2Theme {
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Greeting(
-                        name = "Android", //传递给Greeting组件的参数
+                        name = username,
+                        isAdmin = isAdmin,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
@@ -44,28 +48,33 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable     //构建UI
-fun Greeting(name: String, modifier: Modifier = Modifier) {
+@Composable
+fun Greeting(
+    name: String, 
+    isAdmin: Boolean = false,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
     val textState = remember { mutableStateOf("") }
-    
+    var showGameModeDialog by remember { mutableStateOf(false) }
+
     Column(
-        modifier = modifier.fillMaxSize(),//填充父容器的全部可用空间
-        horizontalAlignment = Alignment.CenterHorizontally,//水平居中
-        verticalArrangement = Arrangement.Center  //垂直居中
+        modifier = modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         // 添加ImageView组件，显示本地图片
         Image(
-            painter = painterResource(id = R.drawable.aaa), // 图片放到drawable目录下.名字是实际的图片名字，去掉后缀
+            painter = painterResource(id = R.drawable.aaa),
             contentDescription = "微信头像",
             modifier = Modifier
-                .size(120.dp)   //图片的尺寸
-                .padding(16.dp),  //图片的内边距
-            contentScale = ContentScale.Fit  //保持图片比例
+                .size(120.dp)
+                .padding(16.dp),
+            contentScale = ContentScale.Fit
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         Text(
             text = "Hello $name!",
             modifier = modifier
@@ -73,18 +82,30 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 显示用户类型
+        Text(
+            text = if (isAdmin) "管理员用户" else "普通用户",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (isAdmin) Color.Red else Color.Green,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(16.dp)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // 添加显示"22010169"的TextView
         Text(
             text = "22010169",
-            fontSize = 24.sp,// 字体大小，单位sp
-            fontWeight = FontWeight.Bold,//字体粗体
-            color = Color.Blue,//文本颜色蓝色
-            textAlign = TextAlign.Center,//居中对齐
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Blue,
+            textAlign = TextAlign.Center,
             modifier = Modifier.padding(16.dp)
         )
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-        
+
         // 添加EditText控件（使用OutlinedTextField）
         OutlinedTextField(
             value = textState.value,
@@ -96,9 +117,9 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // 添加Button控件
         Button(
             onClick = {
@@ -113,14 +134,118 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
         ) {
             Text("显示输入内容")
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 开始五子棋游戏按钮
+        Button(
+            onClick = {
+                showGameModeDialog = true
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(56.dp)
+        ) {
+            Text("开始五子棋游戏")
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // 显示权限信息
+        Text(
+            text = if (isAdmin) "管理员权限：可以悔棋" else "普通用户：无法悔棋",
+            fontSize = 12.sp,
+            color = Color.Gray,
+            textAlign = TextAlign.Center
+        )
+    }
+
+    // 对战模式选择对话框
+    if (showGameModeDialog) {
+        GameModeDialog(
+            onDismiss = { showGameModeDialog = false },
+            onModeSelected = { mode, opponent ->
+                val intent = Intent(context, GameActivity::class.java)
+                intent.putExtra("username", name)
+                intent.putExtra("isAdmin", isAdmin)
+                intent.putExtra("gameMode", mode)
+                intent.putExtra("opponent", opponent)
+                intent.putExtra("opponentNickname", opponent)
+                context.startActivity(intent)
+                showGameModeDialog = false
+            }
+        )
     }
 }
 
+@Composable
+fun GameModeDialog(
+    onDismiss: () -> Unit,
+    onModeSelected: (String, String) -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "选择对战模式",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 人机对战模式
+                Button(
+                    onClick = { onModeSelected("human_vs_ai", "AI") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text("人机对战")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 双人对战模式（与管理员对战）
+                Button(
+                    onClick = { onModeSelected("human_vs_admin", "管理员") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text("与管理员对战")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 取消按钮
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("取消")
+                }
+            }
+        }
+    }
+}
 
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
     Project2Theme {
-        Greeting("Android")
+        Greeting("Android", false)
     }
 }

@@ -6,24 +6,25 @@ import androidx.room.RoomDatabase
 import android.content.Context
 
 @Database(
-    entities = [User::class, Friend::class],
-    version = 1,
+    entities = [User::class, Friend::class, GameRule::class, GameRecord::class, GameMove::class, UserStats::class],
+    version = 3, // 增加版本号
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
-    
+    abstract fun gameStatsDao(): GameStatsDao // 添加新的DAO
+
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
-        
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "app_database"
-                ).build()
+                ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
             }
