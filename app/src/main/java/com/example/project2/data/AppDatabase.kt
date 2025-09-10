@@ -8,13 +8,13 @@ import android.util.Log
 
 @Database(
     entities = [User::class, Friend::class, GameRule::class, GameRecord::class, GameMove::class, UserStats::class],
-    version = 4, // Ôö¼Ó°æ±¾ºÅ
+    version = 4, // å¢åŠ ç‰ˆæœ¬å·
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
     abstract fun gameStatsDao(): GameStatsDao
-    abstract fun gameRuleDao(): GameRuleDao // Ìí¼ÓĞÂµÄDAO
+    abstract fun gameRuleDao(): GameRuleDao // æ·»åŠ æ–°çš„DAO
 
     companion object {
         @Volatile
