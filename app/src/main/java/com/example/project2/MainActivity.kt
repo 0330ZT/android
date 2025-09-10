@@ -164,7 +164,7 @@ fun Greeting(
                 )
             }
 
-            // 游戏统计概览卡片 (直接显示在主界面)
+            // 游戏统计概览卡片 (直接显示在主界面) - 使用Flow实现实时更新
             item {
                 GameStatsOverviewCard(username = name)
             }
@@ -658,81 +658,80 @@ fun GameStatsOverviewCard(username: String) {
     var userStats by remember { mutableStateOf<UserStats?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // 修复数据加载逻辑 - 只统计人机对战
+    // 使用Flow实现实时更新
     LaunchedEffect(username) {
         isLoading = true
         try {
             val database = AppDatabase.getDatabase(context)
             
-            // 直接获取游戏记录，不使用 Flow
-            val allRecords = database.gameStatsDao().getUserGameRecords(username)
-            
-            // 使用 first() 获取第一个值，避免一直等待
-            val records = allRecords.first()
-            
-            // 筛选出人机对战的记录
-            val aiGameRecords = records.filter { record ->
-                record.gameMode == "human_vs_ai" || 
-                record.player2 == "AI"
-            }
-            
-            Log.d("GameStatsOverview", "Found ${aiGameRecords.size} AI game records")
-            aiGameRecords.forEach { record ->
-                Log.d("GameStatsOverview", "Record: winner=${record.winner}, player1=${record.player1}, player2=${record.player2}, gameMode=${record.gameMode}")
-            }
-            
-            // 计算人机对战的统计 - 修复胜负判断逻辑
-            val totalGames = aiGameRecords.size
-            val wins = aiGameRecords.count { record ->
-                // 修复胜负判断逻辑 - 根据棋子颜色判断
-                when {
-                    record.winner == "black" && record.player1 == username -> true  // 黑棋胜利且用户是黑棋
-                    record.winner == "white" && record.player1 == username -> false // 白棋胜利但用户是黑棋
-                    record.winner == "black" && record.player2 == username -> false // 黑棋胜利但用户是白棋
-                    record.winner == "white" && record.player2 == username -> true  // 白棋胜利且用户是白棋
-                    record.winner == null -> false     // 平局算失败
-                    else -> false
+            // 使用Flow监听数据库变化
+            database.gameStatsDao().getUserGameRecords(username).collectLatest { records ->
+                Log.d("GameStatsOverview", "Flow updated with ${records.size} records")
+                
+                // 筛选出人机对战的记录
+                val aiGameRecords = records.filter { record ->
+                    record.gameMode == "human_vs_ai" || 
+                    record.player2 == "AI"
                 }
-            }
-            val losses = aiGameRecords.count { record ->
-                when {
-                    record.winner == "black" && record.player1 == username -> false // 黑棋胜利且用户是黑棋
-                    record.winner == "white" && record.player1 == username -> true  // 白棋胜利但用户是黑棋
-                    record.winner == "black" && record.player2 == username -> true  // 黑棋胜利但用户是白棋
-                    record.winner == "white" && record.player2 == username -> false // 白棋胜利且用户是白棋
-                    record.winner == null -> true      // 平局算失败
-                    else -> true
+                
+                Log.d("GameStatsOverview", "Found ${aiGameRecords.size} AI game records")
+                aiGameRecords.forEach { record ->
+                    Log.d("GameStatsOverview", "Record: winner=${record.winner}, player1=${record.player1}, player2=${record.player2}, gameMode=${record.gameMode}")
                 }
+                
+                // 计算人机对战的统计 - 修复胜负判断逻辑
+                val totalGames = aiGameRecords.size
+                val wins = aiGameRecords.count { record ->
+                    // 修复胜负判断逻辑 - 根据棋子颜色判断
+                    when {
+                        record.winner == "black" && record.player1 == username -> true  // 黑棋胜利且用户是黑棋
+                        record.winner == "white" && record.player1 == username -> false // 白棋胜利但用户是黑棋
+                        record.winner == "black" && record.player2 == username -> false // 黑棋胜利但用户是白棋
+                        record.winner == "white" && record.player2 == username -> true  // 白棋胜利且用户是白棋
+                        record.winner == null -> false     // 平局算失败
+                        else -> false
+                    }
+                }
+                val losses = aiGameRecords.count { record ->
+                    when {
+                        record.winner == "black" && record.player1 == username -> false // 黑棋胜利且用户是黑棋
+                        record.winner == "white" && record.player1 == username -> true  // 白棋胜利但用户是黑棋
+                        record.winner == "black" && record.player2 == username -> true  // 黑棋胜利但用户是白棋
+                        record.winner == "white" && record.player2 == username -> false // 白棋胜利且用户是白棋
+                        record.winner == null -> true      // 平局算失败
+                        else -> true
+                    }
+                }
+                val draws = aiGameRecords.count { record ->
+                    record.winner == null
+                }
+                val winRate = if (totalGames > 0) wins.toFloat() / totalGames else 0f
+                
+                Log.d("GameStatsOverview", "Calculated stats: totalGames=$totalGames, wins=$wins, losses=$losses, draws=$draws, winRate=$winRate")
+                
+                // 创建人机对战统计
+                val aiStats = UserStats(
+                    username = username,
+                    totalGames = totalGames,
+                    wins = wins,
+                    losses = losses,
+                    draws = draws,
+                    winRate = winRate,
+                    totalPlayTime = aiGameRecords.sumOf { (it.endTime ?: 0L) - it.startTime },
+                    averageGameTime = if (totalGames > 0) aiGameRecords.sumOf { (it.endTime ?: 0L) - it.startTime } / totalGames else 0L,
+                    longestWinStreak = calculateWinStreak(aiGameRecords, username),
+                    currentWinStreak = calculateCurrentWinStreak(aiGameRecords, username),
+                    bestMoveCount = 0, // 暂时设为0，因为GameRecord没有moveCount字段
+                    lastPlayTime = aiGameRecords.maxOfOrNull { it.startTime } ?: 0L
+                )
+                
+                userStats = aiStats
+                isLoading = false
+                Log.d("GameStatsOverview", "Final AI game stats for $username: $aiStats")
             }
-            val draws = aiGameRecords.count { record ->
-                record.winner == null
-            }
-            val winRate = if (totalGames > 0) wins.toFloat() / totalGames else 0f
-            
-            Log.d("GameStatsOverview", "Calculated stats: totalGames=$totalGames, wins=$wins, losses=$losses, draws=$draws, winRate=$winRate")
-            
-            // 创建人机对战统计
-            val aiStats = UserStats(
-                username = username,
-                totalGames = totalGames,
-                wins = wins,
-                losses = losses,
-                draws = draws,
-                winRate = winRate,
-                totalPlayTime = aiGameRecords.sumOf { (it.endTime ?: 0L) - it.startTime },
-                averageGameTime = if (totalGames > 0) aiGameRecords.sumOf { (it.endTime ?: 0L) - it.startTime } / totalGames else 0L,
-                longestWinStreak = calculateWinStreak(aiGameRecords, username),
-                currentWinStreak = calculateCurrentWinStreak(aiGameRecords, username),
-                bestMoveCount = 0, // 暂时设为0，因为GameRecord没有moveCount字段
-                lastPlayTime = aiGameRecords.maxOfOrNull { it.startTime } ?: 0L
-            )
-            
-            userStats = aiStats
-            Log.d("GameStatsOverview", "Final AI game stats for $username: $aiStats")
         } catch (e: Exception) {
             Log.e("GameStatsOverview", "Error loading AI game stats: ${e.message}")
             userStats = UserStats(username = username) // 使用默认值
-        } finally {
             isLoading = false
         }
     }
