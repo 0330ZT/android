@@ -24,6 +24,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.project2.ui.theme.Project2Theme
+import android.util.Log
+import com.example.project2.data.AppDatabase
+import com.example.project2.data.User
+import com.example.project2.data.GameRule
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +61,42 @@ fun Greeting(
     val context = LocalContext.current
     val textState = remember { mutableStateOf("") }
     var showGameModeDialog by remember { mutableStateOf(false) }
+    
+    // 添加数据库初始化
+    LaunchedEffect(Unit) {
+        val database = AppDatabase.getDatabase(context)
+        Log.d("Database", "Database initialized: ${database.isOpen}")
+        
+        // 初始化游戏规则
+        val existingRule = database.gameRuleDao().getGameRule()
+        if (existingRule == null) {
+            val defaultRule = GameRule(
+                id = 1,
+                boardSize = 15,
+                winCount = 5,
+                allowUndo = true,
+                hasForbiddenMoves = false,
+                maxMoves = 225,
+                ruleDescription = "标准五子棋规则：15x15棋盘，连成5子获胜"
+            )
+            database.gameRuleDao().insertGameRule(defaultRule)
+            Log.d("Database", "Default game rule inserted")
+        }
+        
+        // 测试数据库操作
+        try {
+            val testUser = User(
+                username = "test_user",
+                password = "test_pass",
+                isAdmin = false,
+                nickname = "测试用户"
+            )
+            database.userDao().insertUser(testUser)
+            Log.d("Database", "Test user inserted successfully")
+        } catch (e: Exception) {
+            Log.e("Database", "Error inserting test user: ${e.message}")
+        }
+    }
 
     Column(
         modifier = modifier.fillMaxSize(),

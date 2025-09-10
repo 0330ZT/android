@@ -4,15 +4,17 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import android.content.Context
+import android.util.Log
 
 @Database(
     entities = [User::class, Friend::class, GameRule::class, GameRecord::class, GameMove::class, UserStats::class],
-    version = 3, // å¢åŠ ç‰ˆæœ¬å·
+    version = 4, // Ôö¼Ó°æ±¾ºÅ
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
-    abstract fun gameStatsDao(): GameStatsDao // æ·»åŠ æ–°çš„DAO
+    abstract fun gameStatsDao(): GameStatsDao
+    abstract fun gameRuleDao(): GameRuleDao // Ìí¼ÓĞÂµÄDAO
 
     companion object {
         @Volatile
